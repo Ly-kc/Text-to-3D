@@ -30,15 +30,15 @@ def get_c2w(theta,phi):
     return c2w
     
 #平均采样
-#返回从近到远
+#返回从近到远 sample_num*1
 def uni_sample(near,far):
     #现将near到far分为num段
     ends = np.linspace(near,far,sample_num+1)
     samples = torch.randn((sample_num,1))
-    for i in sample_num:
+    for i in range(sample_num):
         samples[i].uniform_(ends[i],ends[i+1])
-    
-    return samples
+    # print(samples)
+    return np.array(samples)
 
 #得到光线原点与方向 
 #h，w为像平面上的坐标，原点为左下角   intrinsics：[H,W,focal]
@@ -48,15 +48,19 @@ def get_ray(c2w,h,w,intrinsics):
     direction = np.array([w-W/2, h-H/2, -focal])
     direction /= np.linalg.norm(direction)
     #再转换到全局坐标系
-    direction = c2w@direction
+    direction = c2w[:3,:3]@direction
     origin = c2w[:3,3]
     return direction,origin
 
 #得到一条光线的颜色
 def render_one_ray(model,c2w,h,w,intrinsics):
-    direction,origin = get_ray(c2w,h,w,intrinsics)
-    samples = origin + uni_sample(0.5*r, 1.5*r)*direction  #batch*3
-    sigma,color = model(samples,direction)  #batch*1, batch*3
+    direction,origin = get_ray(c2w,h,w,intrinsics) #(3,)
+    samples = uni_sample(0.5*r, 1.5*r)*direction  #batch*3
+    samples += origin
+    directions = np.ones_like(samples) #batch*3
+    directions *= direction 
+    # print(directions.shape)
+    sigma,color = model(samples,directions)  #batch*1, batch*3
     pixel_color = torch.zeros(3)
     total_alpha = 1 #透明度 
     delta = 1/sample_num 
@@ -71,8 +75,8 @@ def render_one_ray(model,c2w,h,w,intrinsics):
 #resolution为图片长宽分辨率
 def render_image(model,c2w,intrinsics,resolution):
     H,W,focal = intrinsics
-    color_img = torch.zeros[(resolution[0],resolution[1],3)]
-    transparence_img = torch.zeros[(resolution[0],resolution[1],1)] 
+    color_img = torch.zeros((resolution[0],resolution[1],3))
+    transparence_img = torch.zeros((resolution[0],resolution[1],1)) 
     for i in range(resolution[0]):
         for j in range(resolution[1]):
             h,w = i/(resolution[0]-1)*H, j/(resolution[1]-1)*W

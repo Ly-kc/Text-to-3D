@@ -16,15 +16,15 @@ def visualize_frame():
             phi = np.pi/8*i
             theta = -np.pi/6/2*j
             c2w = get_c2w(phi=phi,theta=theta)
-            xs = c2w@(np.array([[j/10,0,0,1] for j in range(3)])[:,:,None])
-            ys = c2w@(np.array([[0,j/10,0,1] for j in range(3)])[:,:,None])
-            zs = c2w@(np.array([[0,0,j/10,1] for j in range(3)])[:,:,None])
+            xs = c2w@(np.array([[j/5,0,0,1] for j in range(2)])[:,:,None])
+            ys = c2w@(np.array([[0,j/5,0,1] for j in range(2)])[:,:,None])
+            zs = c2w@(np.array([[0,0,j/5,1] for j in range(2)])[:,:,None])
             assert(xs[0,3,0] == 1)
             # assert(np.dot(xs[1,:,0] - xs[0,:,0],ys[1,:,0] - ys[0,:,0]) == 0 and 
             #        np.dot(xs[1,:,0] - xs[0,:,0],zs[1,:,0] - zs[0,:,0]) == 0)
-            ax.plot(xs[:,0,0],xs[:,1,0],xs[:,2,0])
-            ax.plot(ys[:,0,0],ys[:,1,0],ys[:,2,0])
-            ax.plot(zs[:,0,0],zs[:,1,0],zs[:,2,0])
+            ax.plot(xs[:,0,0],xs[:,1,0],xs[:,2,0],color="red")
+            ax.plot(ys[:,0,0],ys[:,1,0],ys[:,2,0],color="blue")
+            ax.plot(zs[:,0,0],zs[:,1,0],zs[:,2,0],color="green")
     plt.axis("equal")
     plt.show()
     

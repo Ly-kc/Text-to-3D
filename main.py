@@ -8,9 +8,9 @@ from model import *
 from util import *
 import huggingface_help
 
-caption = "A sculpture of a yellow cat"
+caption = "A sculpture of a white cat"
 intrinsics = (r,r,r)
-resolution = 20*20
+resolution = (20,20)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
 print(device)
@@ -19,7 +19,7 @@ net = SimpleNet().to(device)
 
 optimizer = optim.SGD(net.parameters(), lr=5e-6, momentum=0.8)
 schedule = torch.optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.97)
-clip_model,clip_processor = huggingface_help.get_model_and_processor()
+clip_model,clip_processor = huggingface_help.get_clip_model_and_processor()
 
 # optimizer=torch.optim.Adam(net.parameters(),
 #                 lr=1e-5,
@@ -29,7 +29,7 @@ clip_model,clip_processor = huggingface_help.get_model_and_processor()
 #                 amsgrad=False)
 
 epoch_losses = []
-for epoch in tqdm.tqdm(range(100)):
+for epoch in tqdm(range(100)):
     #选定角度(弧度制)
     theta = -np.pi/12  
     phi_list = np.linspace(0,2*np.pi,24,endpoint=False)
