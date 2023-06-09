@@ -11,6 +11,7 @@ import pretrained_model
 caption = "A sculpture of a white cat"
 intrinsics = (r,r,r)
 resolution = (20,20)
+view_num = 4
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
 print(device)
@@ -32,23 +33,26 @@ epoch_losses = []
 for epoch in tqdm(range(100)):
     #选定角度(弧度制)
     theta = -np.pi/12  
-    phi_list = np.linspace(0,2*np.pi,24,endpoint=False)
+    phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) #24
     running_loss = 0.0
+    color_imgs = torch.zeros(view_num,resolution[0],resolution[1],3)
+    trans_imgs = torch.zeros(view_num,resolution[0],resolution[1],1)
     for i,phi in enumerate(phi_list):
-        optimizer.zero_grad()
-        clean_optimizer.zero_grad()
         c2w = get_c2w(theta,phi)
-        color_img,trans_img = render_image(net,c2w,intrinsics,resolution)
-        loss = calcu_clip_loss(color_img[None,...],trans_img,caption,clip_model,clip_processor,device)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item()
+        color_imgs[i],trans_imgs[i] = render_image(net,c2w,intrinsics,resolution)
+        print(i)
+    optimizer.zero_grad()
+    clean_optimizer.zero_grad()
+    loss = calcu_clip_loss(color_imgs,trans_imgs,caption,clip_model,clip_processor,device)
+    loss.backward()
+    optimizer.step()
+    running_loss += loss.item()
         # if i%1000 == 999:
         #     print(f"[{epoch+1} , {i+1:5d}] \\\
         #         loss: {running_loss / 1000:3f}")
         #     running_loss = 0.0
     print(f"[{epoch+1}] \\\
-        loss: {running_loss / 1000:3f}")
+        loss: {running_loss / view_num:3f}")
     epoch_losses.append(running_loss)
     
             

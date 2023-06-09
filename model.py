@@ -39,7 +39,8 @@ class SimpleNet(nn.Module):
         return sigma,color
     
     
-    
+
+#image:batch*resolution[0]*resolution[1]    
 def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,device):
     color_img = color_img*255
     color_img = color_img.permute(0,3,1,2)
@@ -49,12 +50,10 @@ def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,de
     text = clip.tokenize([caption]).to(device)
 
     logits_per_image, logits_per_text = clip_model(color_img, text)
-    print(logits_per_image)
-    loss_clip = -logits_per_image
+    loss_clip = -logits_per_image.sum(axis=0)[0]
 
-    # aver_trans = torch.mean(trans_img,dim=(0,1))
-    # print(aver_trans.shape,"hahahah")
-    # loss_trans = -torch.min(torch.tensor(0.5),aver_trans)
-    loss_trans = 0
+    aver_trans = torch.mean(trans_img,dim=(0,1,2))
+    loss_trans = -torch.min(torch.tensor(0.5),aver_trans)[0]
 
-    return loss_clip + loss_trans*0.05
+    print(loss_clip,loss_trans)
+    return loss_clip + loss_trans*100
