@@ -65,9 +65,9 @@ def render_one_ray(model,c2w,h,w,intrinsics):
     total_alpha = 1 #透明度 
     delta = 1/sample_num 
     for i in range(sample_num):
-        local_alpha = torch.exp(sigma[i])
-        pixel_color += total_alpha*(1-local_alpha)*color[i]
-        total_alpha *= local_alpha
+        local_alpha = torch.exp(sigma[i].clone())
+        pixel_color = pixel_color + total_alpha*(1-local_alpha)*color[i]
+        total_alpha = total_alpha*local_alpha   #*=也不能用？
     
     return pixel_color,total_alpha
     

@@ -4,7 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from Fourier_Features import Fourier_embedding
-import huggingface_help
+import clip
+from PIL import Image
 
 class SimpleNet(nn.Module):
     def __init__(self):
@@ -39,14 +40,21 @@ class SimpleNet(nn.Module):
     
     
     
-def clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor):
-    color_img *= 255
-    inputs = clip_processor(text=[caption], images=color_img, 
-                            return_tensors="pt", padding=True)
-    outputs = clip_model(**inputs)
-    loss_clip = outputs.logits_per_image.sum(dim=1) # this is the image-text similarity score
+def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,device):
+    color_img = color_img*255
+    color_img = color_img.permute(0,3,1,2)
+    color_img = F.interpolate(color_img, size=(224,224))
 
-    aver_trans = torch.mean(trans_img,dim=(0,1))
-    loss_trans = -torch.min(0.5,aver_trans.item())
+    # print(color_img.shape)
+    text = clip.tokenize([caption]).to(device)
+
+    logits_per_image, logits_per_text = clip_model(color_img, text)
+    print(logits_per_image)
+    loss_clip = -logits_per_image
+
+    # aver_trans = torch.mean(trans_img,dim=(0,1))
+    # print(aver_trans.shape,"hahahah")
+    # loss_trans = -torch.min(torch.tensor(0.5),aver_trans)
+    loss_trans = 0
 
     return loss_clip + loss_trans*0.05
