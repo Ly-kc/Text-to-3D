@@ -35,12 +35,14 @@ for epoch in tqdm(range(100)):
     theta = -np.pi/12  
     phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) #24
     running_loss = 0.0
-    color_imgs = torch.zeros(view_num,resolution[0],resolution[1],3)
-    trans_imgs = torch.zeros(view_num,resolution[0],resolution[1],1)
-    for i,phi in enumerate(phi_list):
-        c2w = get_c2w(theta,phi)
-        color_imgs[i],trans_imgs[i] = render_image(net,c2w,intrinsics,resolution)
-        print(i)
+    # color_imgs = torch.zeros(view_num,resolution[0],resolution[1],3)
+    # trans_imgs = torch.zeros(view_num,resolution[0],resolution[1],1)
+    # for i,phi in enumerate(phi_list):
+    #     c2w = get_c2w(theta,phi)
+    #     color_imgs[i],trans_imgs[i] = render_image(net,c2w,intrinsics,resolution)
+    #     print(i)
+    c2w = get_c2w(theta,phi_list)
+    color_imgs,trans_imgs = render_image(net,c2w,intrinsics,resolution)
     optimizer.zero_grad()
     clean_optimizer.zero_grad()
     loss = calcu_clip_loss(color_imgs,trans_imgs,caption,clip_model,clip_processor,device)

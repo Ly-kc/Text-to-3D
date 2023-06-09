@@ -23,9 +23,9 @@ def get_c2w(theta,phi):
                     [0,0,0,1]])
     roty = np.zeros((phi.shape[0],4,4))
     for i,p in enumerate(phi):
-        roty[i] = np.array([[np.cos(phi),0,np.sin(phi),0],
+        roty[i] = np.array([[np.cos(p),0,np.sin(p),0],
                         [0.0,1,0,0],
-                        [-np.sin(phi),0,np.cos(phi),0],
+                        [-np.sin(p),0,np.cos(p),0],
                         [0,0,0,1]])
     c2w = roty@rotx@c2w
 
@@ -63,7 +63,7 @@ def render_one_ray(model,c2w,h,w,intrinsics):
     directions = np.ones_like(samples) #(n,sample_num,3)
     directions = directions*direction[:,None,:] #(n,sample_num,3)
     # print(directions.shape)
-    samples,directions = samples.view(-1,3),direction.view(-1,3)
+    samples,directions = samples.reshape(-1,3),directions.reshape(-1,3)
     sigma,color = model(samples,directions)  #batch*1, batch*3
     sigma,color = sigma.view(view_num,-1,1),color.view(view_num,-1,3) #(n,sample_num,1)  (n,sample_num,3)
     pixel_color = torch.zeros((view_num,3))
@@ -73,13 +73,13 @@ def render_one_ray(model,c2w,h,w,intrinsics):
         pixel_color = pixel_color + total_alpha*(1-local_alpha)*color[:,i,:]  #(n,3)
         total_alpha = total_alpha*local_alpha  
     
-    return pixel_color,total_alpha[:,0]  #(n,3)  (n,)
+    return pixel_color,total_alpha  #(n,3)  (n,)
     
 #渲染得到图片 
 #resolution为图片长宽分辨率
 #每次得到n个视角同一个位置像素的颜色 
 # c2w:(n,4,4)
-# color_img:(n,reso[0],reso[1],3)
+# color_img:(n,reso[0],reso[1],3) trans_img:(n,reso[0],reso[1],1)
 def render_image(model,c2w,intrinsics,resolution):
     H,W,focal = intrinsics
     view_num = c2w.shape[0]
@@ -88,7 +88,7 @@ def render_image(model,c2w,intrinsics,resolution):
     for i in range(resolution[0]):
         for j in range(resolution[1]):
             h,w = i/(resolution[0]-1)*H, j/(resolution[1]-1)*W
-            color_img[:,i,j,:],transparence_img[:,i,j] = render_one_ray(model,c2w,h,w,intrinsics)
+            color_img[:,i,j,:],transparence_img[:,i,j,:] = render_one_ray(model,c2w,h,w,intrinsics)
     # print(color_img)
     return color_img,transparence_img 
 
