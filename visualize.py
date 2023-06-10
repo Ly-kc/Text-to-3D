@@ -5,6 +5,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from util import *
 import os
 
+from model import SimpleNet
+
 def visualize_frame():   
     fig = plt.figure()
     ax = fig.add_subplot(projection = '3d') 
@@ -28,17 +30,26 @@ def visualize_frame():
     plt.axis("equal")
     plt.show()
     
-def visualize_scene(model,intrinsics,resolution):
+def visualize_scene():
+    intrinsics = (r,r,r)
+    resolution = (32,32)
+    net = SimpleNet("cpu")
+    net.load_state_dict(torch.load("cat" + ".pth"))
+    net.eval()
+    print("ok")
+    theta = -np.pi/9  
+    phi_list = np.linspace(0,2*np.pi,9,endpoint=False) 
+    c2w = get_c2w(phi=phi_list,theta=theta)
+    with torch.no_grad():
+        color_img,trans_img = render_image(net,c2w,intrinsics,resolution)
+    if not os.path.isdir("./result"):
+        os.mkdir("result")
     for i in range(9):
-        phi = np.pi/8*i
-        theta = -np.pi/9
-        c2w = get_c2w(phi=phi,theta=theta)
-        color_img,trans_img = render_image(model,c2w,intrinsics,resolution)
-        img_pil = Image.fromarray(color_img)
-        if not os.path.isdir("result"):
-            os.mkdir("result")
+        # print(i,color_img[i])
+        img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255*100))
         img_pil.save (f"result/color{i}.jpg")
         # print(np.asarray(image).shape)
 
 if __name__=="__main__":
-    visualize_frame()
+    visualize_scene()
+    # visualize_frame()

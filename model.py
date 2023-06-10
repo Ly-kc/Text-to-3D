@@ -8,28 +8,29 @@ import clip
 from PIL import Image
 
 class SimpleNet(nn.Module):
-    def __init__(self):
+    def __init__(self,device):
         super().__init__()
         self.x_module = nn.Sequential(
-            nn.Linear(64,128),nn.ReLU(),
-            nn.Linear(128,256),nn.ReLU(),
-            nn.Linear(256,512),nn.ReLU(),
-            nn.Linear(512,1024),nn.ReLU(),
-            nn.Linear(1024,256),nn.ReLU()            
+            nn.Linear(64,128),nn.LeakyReLU(),
+            nn.Linear(128,256),nn.LeakyReLU(),
+            nn.Linear(256,512),nn.LeakyReLU(),
+            nn.Linear(512,1024),nn.LeakyReLU(),
+            nn.Linear(1024,256),nn.LeakyReLU()            
         )
         self.sigma_module = nn.Sequential(
-            nn.Linear(256,32),nn.ReLU(),
-            nn.Linear(32,1),nn.ReLU() #应当大于零
+            nn.Linear(256,32),nn.LeakyReLU(),
+            nn.Linear(32,1),nn.LeakyReLU() #应当大于零
         )
         self.color_module = nn.Sequential(
-            nn.Linear(256+64,128),nn.ReLU(),
-            nn.Linear(128,64),nn.ReLU(),
+            nn.Linear(256+64,128),nn.LeakyReLU(),
+            nn.Linear(128,64),nn.LeakyReLU(),
             nn.Linear(64,3),nn.Sigmoid() #应当归一化  
         )
-        self.b = np.load("magic_fourier.npy") #会在Fourier_embedding中被统一转为tensor   
+        self.b = np.load("magic_fourier.npy") #会在Fourier_embedding中被统一转为tensor  
+        self.device=device 
     def forward(self,x,dir):
-        x = Fourier_embedding(x,self.b) #batch*64
-        dir = Fourier_embedding(dir,self.b)
+        x = Fourier_embedding(x,self.b,self.device) #batch*64
+        dir = Fourier_embedding(dir,self.b,self.device)
         x = self.x_module(x)
         sigma = self.sigma_module(x) #batch*1
         

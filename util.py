@@ -21,6 +21,7 @@ def get_c2w(theta,phi):
                     [0,np.cos(theta),-np.sin(theta),0],
                     [0,np.sin(theta),np.cos(theta),0],
                     [0,0,0,1]])
+    
     roty = np.zeros((phi.shape[0],4,4))
     for i,p in enumerate(phi):
         roty[i] = np.array([[np.cos(p),0,np.sin(p),0],
