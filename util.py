@@ -56,24 +56,24 @@ def get_ray(c2w,h,w,intrinsics):
     return direction,origin
 
 #得到一条光线的颜色
-def render_one_ray(model,c2w,h,w,intrinsics):
+def render_one_ray(model,c2w,h,w,intrinsics,device):
     view_num = c2w.shape[0]
     direction,origin = get_ray(c2w,h,w,intrinsics) #(n,3)
     samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n,1,3)  = n*sample_num*3
     samples = samples + origin[:,None,:]  #n*sample_num*3
     directions = np.ones_like(samples) #(n,sample_num,3)
     directions = directions*direction[:,None,:] #(n,sample_num,3)
-    # print(directions.shape)
+    
     samples,directions = samples.reshape(-1,3),directions.reshape(-1,3)
-    sigma,color = model(samples,directions)  #batch*1, batch*3
+    sigma,color = model(samples,directions)  #返回batch*1, batch*3
     sigma,color = sigma.view(view_num,-1,1),color.view(view_num,-1,3) #(n,sample_num,1)  (n,sample_num,3)
-    pixel_color = torch.zeros((view_num,3))
-    total_alpha = torch.ones(view_num,1) #透明度 
+    
+    pixel_color = torch.zeros((view_num,3),device=device)
+    total_alpha = torch.ones(view_num,1,device=device) #透明度 
     for i in range(sample_num):
-        local_alpha = torch.exp(sigma[:,i,:].clone()) #(n,1)
+        local_alpha = torch.exp(-sigma[:,i,:].clone()) #(n,1)
         pixel_color = pixel_color + total_alpha*(1-local_alpha)*color[:,i,:]  #(n,3)
         total_alpha = total_alpha*local_alpha  
-    
     return pixel_color,total_alpha  #(n,3)  (n,)
     
 #渲染得到图片 
@@ -81,15 +81,15 @@ def render_one_ray(model,c2w,h,w,intrinsics):
 #每次得到n个视角同一个位置像素的颜色 
 # c2w:(n,4,4)
 # color_img:(n,reso[0],reso[1],3) trans_img:(n,reso[0],reso[1],1)
-def render_image(model,c2w,intrinsics,resolution):
+def render_image(model,c2w,intrinsics,resolution,device):
     H,W,focal = intrinsics
     view_num = c2w.shape[0]
-    color_img = torch.zeros((view_num,resolution[0],resolution[1],3))
-    transparence_img = torch.zeros((view_num,resolution[0],resolution[1],1)) 
+    color_img = torch.zeros((view_num,resolution[0],resolution[1],3),device=device)
+    transparence_img = torch.zeros((view_num,resolution[0],resolution[1],1),device=device) 
     for i in range(resolution[0]):
         for j in range(resolution[1]):
             h,w = i/(resolution[0]-1)*H, j/(resolution[1]-1)*W
-            color_img[:,i,j,:],transparence_img[:,i,j,:] = render_one_ray(model,c2w,h,w,intrinsics)
+            color_img[:,i,j,:],transparence_img[:,i,j,:] = render_one_ray(model,c2w,h,w,intrinsics,device)
     # print(color_img)
     return color_img,transparence_img 
 

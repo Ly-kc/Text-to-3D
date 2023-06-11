@@ -13,7 +13,7 @@ def Fourier_embedding(pos,b,device="cpu"):
     degrees = 2*3.1415926*(b@pos[:,:,None])    #batch*m*1
     sins,coss = np.sin(degrees),np.cos(degrees)    #batch*m*1
     output = np.concatenate((sins,coss),axis=1)[:,:,0] #batch*2m
-    output = torch.tensor(output,requires_grad=False,dtype=torch.float32).to(device)
+    output = torch.tensor(output, dtype=torch.float32, device=device)
     # print(output)
     return output
 

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from util import *
 import os
+from tqdm import tqdm
 
 from model import SimpleNet
 
@@ -32,22 +33,21 @@ def visualize_frame():
     
 def visualize_scene():
     intrinsics = (r,r,r)
-    resolution = (32,32)
-    net = SimpleNet("cpu")
-    net.load_state_dict(torch.load("cat" + ".pth"))
+    resolution = (128,128)
+    net = SimpleNet("cuda").to("cuda")
+    net.load_state_dict(torch.load("smallcat1view" + ".pth"))
     net.eval()
-    print("ok")
-    theta = -np.pi/9  
-    phi_list = np.linspace(0,2*np.pi,9,endpoint=False) 
+    theta = -np.pi/12  
+    phi_list = np.linspace(0,2*np.pi,2,endpoint=False) 
     c2w = get_c2w(phi=phi_list,theta=theta)
     with torch.no_grad():
-        color_img,trans_img = render_image(net,c2w,intrinsics,resolution)
+        color_img,trans_img = render_image(net,c2w,intrinsics,resolution,"cuda")
     if not os.path.isdir("./result"):
         os.mkdir("result")
-    for i in range(9):
+    for i in range(2):
         # print(i,color_img[i])
-        img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255*100))
-        img_pil.save (f"result/color{i}.jpg")
+        img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255*2))
+        img_pil.save (f"result/oneview{i}.jpg")
         # print(np.asarray(image).shape)
 
 if __name__=="__main__":
