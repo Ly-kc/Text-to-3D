@@ -13,7 +13,7 @@ import pretrained_model
 # torch.autograd.set_detect_anomaly(True)
 caption = "A sculpture of a white cat"
 intrinsics = (r,r,r)
-resolution = (48,48)
+resolution = (96,128)
 view_num = 1
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
@@ -27,7 +27,7 @@ net = SimpleNet(device).to(device)
 clip_model,clip_processor = pretrained_model.get_clip_model_and_processor(device) 
 clean_optimizer = optim.SGD(clip_model.parameters(), lr=5e-6, momentum=0.8)
 optimizer=torch.optim.Adam(net.parameters(),
-                lr=1e-4,
+                lr=2e-4,
                 betas=(0.9, 0.999),
                 eps=1e-08,
                 weight_decay=0,
@@ -41,7 +41,7 @@ phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) #24
 c2w = get_c2w(theta,phi_list)
 print(c2w.shape)
 
-for epoch in tqdm(range(1000)):
+for epoch in tqdm(range(800)):
     running_loss = 0.0
     optimizer.zero_grad()
     clean_optimizer.zero_grad()
@@ -51,13 +51,14 @@ for epoch in tqdm(range(1000)):
     loss = calcu_clip_loss(color_imgs,trans_imgs,caption,clip_model,clip_processor,device)
     time3 = time.time()
     loss.backward()
-    optimizer.step()
     time4 = time.time()
-    print(time2-time1,time3-time2,time4-time3)
+    optimizer.step()
+    time5 = time.time()
+    print(time2-time1,time3-time2,time4-time3,time5-time4)
     running_loss += loss.item()
     print(f"[{epoch+1}] \\\
         loss: {running_loss / view_num:3f}")
     epoch_losses.append(running_loss)
     
             
-torch.save(net.state_dict(),"smallcat1view.pth")
+torch.save(net.state_dict(),"800scat2view.pth")

@@ -12,10 +12,10 @@ class SimpleNet(nn.Module):
         super().__init__()
         self.x_module = nn.Sequential(
             nn.Linear(64,128),nn.ReLU(),
-            nn.Linear(128,256),nn.ReLU(),
-            # nn.Linear(256,512),nn.ReLU(),
-            # nn.Linear(512,1024),nn.ReLU(),
-            # nn.Linear(1024,256),nn.ReLU()            
+            nn.Linear(128,256),nn.ReLU(), 
+            nn.Linear(256,512),nn.ReLU(),
+            nn.Linear(512,1024),nn.ReLU(),
+            nn.Linear(1024,256),nn.ReLU()            
         )
         self.sigma_module = nn.Sequential(
             nn.Linear(256,32),nn.ReLU(),
