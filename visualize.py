@@ -70,9 +70,9 @@ def visualize_ray():
     
 def visualize_scene():
     intrinsics = (r,r,r)
-    resolution = (128,128)
+    resolution = (96,128)
     net = SimpleNet("cuda").to("cuda")
-    net.load_state_dict(torch.load("800scat2view" + ".pth"))
+    net.load_state_dict(torch.load("new800scat2view" + ".pth"))
     net.eval()
     theta = -np.pi/12  
     phi_list = np.linspace(0,2*np.pi,2,endpoint=False) 
@@ -83,8 +83,8 @@ def visualize_scene():
         os.mkdir("result")
     for i in range(2):
         # print(i,color_img[i])
-        img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255*10))
-        img_pil.save (f"result/aaaview{i}.jpg")
+        img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255*5))
+        img_pil.save (f"result/newview{i}.jpg")
         # print(np.asarray(image).shape)
 
 if __name__=="__main__":

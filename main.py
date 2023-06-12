@@ -13,8 +13,8 @@ import pretrained_model
 # torch.autograd.set_detect_anomaly(True)
 caption = "A sculpture of a white cat"
 intrinsics = (r,r,r)
-resolution = (96,128)
-view_num = 1
+resolution = (64,64)
+view_num = 2
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # device = "cpu"
 print(device)
@@ -61,4 +61,4 @@ for epoch in tqdm(range(800)):
     epoch_losses.append(running_loss)
     
             
-torch.save(net.state_dict(),"800scat2view.pth")
+torch.save(net.state_dict(),"new800scat2view.pth")

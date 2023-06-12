@@ -71,8 +71,15 @@ def render_one_ray(model,c2w,h,w,intrinsics,device):
     sigma,color = sigma.view(view_num,-1,1),color.view(view_num,-1,3) #(n,sample_num,1)  (n,sample_num,3)
 
     return sigma,color
-    
-    
+
+def ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution1,device):
+    pixel_color = torch.zeros((view_num,resolution1,3),device=device) #(view_num,3)
+    total_alpha = torch.ones([view_num,resolution1,1],device=device) #透明度 
+    for k in range(sample_num):
+        local_alpha = torch.exp(-row_sigma_samples[:,:,k,:]) #(n,reso[1],1)
+        pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,k,:]  #(n,reso[1],3)
+        total_alpha = total_alpha*local_alpha  
+    return pixel_color,total_alpha
 
 #渲染得到图片 
 #resolution为图片长宽分辨率
@@ -100,8 +107,7 @@ def render_image(model,c2w,intrinsics,resolution,device):
             pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,k,:]  #(n,reso[1],3)
             total_alpha = total_alpha*local_alpha  
             # print(total_alpha[0,0])
-        color_img[:,i] = pixel_color
-        transparence_img[:,i] = total_alpha
+        color_img[:,i],transparence_img[:,i] = ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution[1],device)
         time3 = time.time()
         # print(time2-time1,time3-time2)
         
