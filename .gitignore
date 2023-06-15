@@ -2,3 +2,4 @@
 *.pptx
 /__pycache__
 *.pth
+/data

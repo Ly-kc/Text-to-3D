@@ -46,39 +46,50 @@ def uni_sample(near,far):
 
 #得到光线原点与方向 
 #h，w为像平面上的坐标，原点为左下角   intrinsics：[H,W,focal]   c2w:(n,4,4)
-def get_ray(c2w,h,w,intrinsics):
+def get_ray(c2w,h,ws,intrinsics):
     H,W,focal = intrinsics
     #先计算出相机系中的光线
-    direction = np.array([w-W/2, h-H/2, -focal])
-    direction /= np.linalg.norm(direction)
+    direction = []
+    for w in ws:
+        direction.append([w-W/2, h-H/2, -focal])
+    direction = np.array(direction)   #(reso[1],3)
+    direction *= (1/np.linalg.norm(direction,axis=1)[:,None]) #(reso[1],3)*(reso[1],1)
     #再转换到全局坐标系
-    direction = c2w[:,:3,:3]@direction #(n,3)
-    origin = c2w[:,:3,3] #(n,3)
-    return direction,origin
+    direction = (c2w[:,None,:3,:3]@direction[:,:,None])[...,0] #(n,1,3,3)@(reso[1],3,1) = (n,reso[1],3,1)
+    origin = c2w[:,None,:3,3].repeat(len(ws),axis=1) #(n,reso[1],3)
+    return direction.reshape(-1,3),origin.reshape(-1,3)   #(n*reso[1] , 3)
 
-#得到一条光线的颜色
-def render_one_ray(model,c2w,h,w,intrinsics,device):
-    time1 = time.time()
+#得到一条光线的颜色 
+# W:(resolution[1],)
+#返回color:(view_num,resolution[1],sample_num,3)
+def render_one_ray(model,c2w,h,ws,intrinsics,device):
+    time0 = time.time()
+    reso = len(ws)
     view_num = c2w.shape[0]
-    direction,origin = get_ray(c2w,h,w,intrinsics) #(n,3)
-    samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n,1,3)  = n*sample_num*3
-    samples = samples + origin[:,None,:]  #n*sample_num*3
-    directions = np.ones_like(samples) #(n,sample_num,3)
-    directions = directions*direction[:,None,:] #(n,sample_num,3)
+    direction,origin = get_ray(c2w,h,ws,intrinsics) #(n*reso[1] , 3)
+    time1 = time.time()
+    samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n*reso,1,3)  = (n*reso,sample_num,3)
+    samples = samples + origin[:,None,:]  #(n*reso,sample_num,3)
+    directions = direction[:,None,:].repeat(sample_num, axis=1)  #(n*reso,sample_num,3)
+    # assert(directions[4,6,1] == newdirections[4,6,1])
     time2 = time.time()
-    samples,directions = samples.reshape(-1,3),directions.reshape(-1,3)
+    samples,directions = samples.reshape(-1,3),directions.reshape(-1,3) #(n*reso*sample_num,3)
     sigma,color = model(samples,directions)  #返回batch*1, batch*3
-    sigma,color = sigma.view(view_num,-1,1),color.view(view_num,-1,3) #(n,sample_num,1)  (n,sample_num,3)
-
+    sigma,color = sigma.view(view_num,reso,sample_num,1),color.view(view_num,reso,sample_num,3) 
+    time3 = time.time()
+    # print(time1-time0,time2-time1,time3-time2)
+    
     return sigma,color
 
-def ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution1,device):
-    pixel_color = torch.zeros((view_num,resolution1,3),device=device) #(view_num,3)
-    total_alpha = torch.ones([view_num,resolution1,1],device=device) #透明度 
+# input: (view_num,resolution[0],resolution[1],,sample_num,3)
+def ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution,device):
+    pixel_color = torch.zeros((view_num,resolution[0],resolution[1],3),device=device) #(view_num,3)
+    total_alpha = torch.ones((view_num,resolution[0],resolution[1],1),device=device) #透明度 
+    alphas = torch.exp(-row_sigma_samples*r/sample_num)  # (view_num,resolution[0],resolution[1],sample_num,3)
     for k in range(sample_num):
-        local_alpha = torch.exp(-row_sigma_samples[:,:,k,:]) #(n,reso[1],1)
-        pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,k,:]  #(n,reso[1],3)
-        total_alpha = total_alpha*local_alpha  
+        local_alpha = alphas[:,:,:,k,:] #(view_num,resolution[0],resolution[1],3)
+        pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,:,k,:]  #(n,reso[1],3)
+        total_alpha = total_alpha*local_alpha  #(view_num,resolution[0],resolution[1],3)
     return pixel_color,total_alpha
 
 #渲染得到图片 
@@ -89,27 +100,21 @@ def ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution1,device)
 def render_image(model,c2w,intrinsics,resolution,device):
     H,W,focal = intrinsics
     view_num = c2w.shape[0]
+    color_samples = torch.zeros((view_num,resolution[0],resolution[1],sample_num,3),device=device)
+    sigma_samples = torch.zeros((view_num,resolution[0],resolution[1],sample_num,1),device=device) 
     color_img = torch.zeros((view_num,resolution[0],resolution[1],3),device=device)
     transparence_img = torch.zeros((view_num,resolution[0],resolution[1],1),device=device) 
     #一次处理一行
+    ws = [j/(resolution[1]-1)*W for j in range(resolution[1])]
+    time1 = time.time()
     for i in range(resolution[0]):
-        row_color_samples = torch.zeros((view_num,resolution[1],sample_num,3),device=device)
-        row_sigma_samples = torch.zeros((view_num,resolution[1],sample_num,1),device=device)
-        time1 = time.time()
-        for j in range(resolution[1]):
-            h,w = i/(resolution[0]-1)*H, j/(resolution[1]-1)*W
-            row_sigma_samples[:,j],row_color_samples[:,j] = render_one_ray(model,c2w,h,w,intrinsics,device)#(n,sample_num,1)  (n,sample_num,3)
-        time2 = time.time()
-        pixel_color = torch.zeros((view_num,resolution[1],3),device=device) #(view_num,3)
-        total_alpha = torch.ones((view_num,resolution[1],1),device=device) #透明度 
-        for k in range(sample_num):
-            local_alpha = torch.exp(-row_sigma_samples[:,:,k,:]) #(n,reso[1],1)
-            pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,k,:]  #(n,reso[1],3)
-            total_alpha = total_alpha*local_alpha  
-            # print(total_alpha[0,0])
-        color_img[:,i],transparence_img[:,i] = ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution[1],device)
-        time3 = time.time()
-        # print(time2-time1,time3-time2)
+        h = i/(resolution[0]-1)*H
+        sigma_samples[:,i],color_samples[:,i] = render_one_ray(model,c2w,h,ws,intrinsics,device)#(n,,reso[1],sample_num,1)  (n,sample_num,3)
+    time2 = time.time()
+    color_img,transparence_img = ray_tracing(sigma_samples,color_samples,view_num,resolution,device)
+    time3 = time.time()
+    # print(time2-time1,time3-time2)
+    
         
     return color_img,transparence_img 
 

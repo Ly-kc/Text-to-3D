@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import transforms
 
 from Fourier_Features import Fourier_embedding
 import clip
@@ -19,15 +20,16 @@ class SimpleNet(nn.Module):
         )
         self.sigma_module = nn.Sequential(
             nn.Linear(256,32),nn.ReLU(),
-            nn.Linear(32,1),nn.ReLU() #应当大于零,但relu不知为什么训练不动
+            nn.Linear(32,1),nn.ReLU() #应当大于零
         )
         self.color_module = nn.Sequential(
             nn.Linear(256+64,128),nn.ReLU(),
             nn.Linear(128,64),nn.ReLU(),
-            nn.Linear(64,3),nn.Sigmoid() #应当位于0-1
+            nn.Linear(64,3),nn.ReLU()
         )
-        self.b = np.load("magic_fourier.npy") #会在Fourier_embedding中被统一转为tensor  
+        self.b = torch.tensor(np.load("magic_fourier.npy"),device=device)   
         self.device=device 
+        
     def forward(self,x,dir):
         x = Fourier_embedding(x,self.b,self.device) #batch*64
         dir = Fourier_embedding(dir,self.b,self.device)
@@ -44,10 +46,11 @@ class SimpleNet(nn.Module):
 
 #image:batch*resolution[0]*resolution[1]    
 def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,device):
-    color_img = color_img*255
+    #preprocess
     color_img = color_img.permute(0,3,1,2)
     color_img = F.interpolate(color_img, size=(224,224))
-
+    color_img = color_img/255
+    color_img = transforms.Normalize(mean=[0.4815,0.4578,0.4082],std=[0.2686,0.2613,0.2758])(color_img)
     # print(color_img.shape)
     text = clip.tokenize([caption]).to(device)
 
@@ -58,5 +61,5 @@ def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,de
     loss_trans = -torch.min(torch.tensor(0.5),aver_trans)[0]
 
     print(aver_trans,loss_clip,loss_trans)
-    loss_trans = 0
-    return loss_clip + loss_trans*10
+    # loss_trans = 0
+    return loss_clip + loss_trans*2
