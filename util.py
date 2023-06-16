@@ -76,20 +76,24 @@ def render_one_ray(model,c2w,h,ws,intrinsics,device):
     samples,directions = samples.reshape(-1,3),directions.reshape(-1,3) #(n*reso*sample_num,3)
     sigma,color = model(samples,directions)  #返回batch*1, batch*3
     sigma,color = sigma.view(view_num,reso,sample_num,1),color.view(view_num,reso,sample_num,3) 
+    # print(sigma[0,60],color[0,60])
     time3 = time.time()
     # print(time1-time0,time2-time1,time3-time2)
     
     return sigma,color
 
 # input: (view_num,resolution[0],resolution[1],,sample_num,3)
-def ray_tracing(row_sigma_samples,row_color_samples,view_num,resolution,device):
+def ray_tracing(sigma_samples,color_samples,view_num,resolution,device):
     pixel_color = torch.zeros((view_num,resolution[0],resolution[1],3),device=device) #(view_num,3)
     total_alpha = torch.ones((view_num,resolution[0],resolution[1],1),device=device) #透明度 
-    alphas = torch.exp(-row_sigma_samples*r/sample_num)  # (view_num,resolution[0],resolution[1],sample_num,3)
+    alphas = torch.exp(-sigma_samples*r/sample_num)  # (view_num,resolution[0],resolution[1],sample_num,3)
     for k in range(sample_num):
         local_alpha = alphas[:,:,:,k,:] #(view_num,resolution[0],resolution[1],3)
-        pixel_color = pixel_color + total_alpha*(1-local_alpha)*row_color_samples[:,:,:,k,:]  #(n,reso[1],3)
+        pixel_color = pixel_color + total_alpha*(1-local_alpha)*color_samples[:,:,:,k,:]  #(n,reso[1],3)
         total_alpha = total_alpha*local_alpha  #(view_num,resolution[0],resolution[1],3)
+    
+    # pixel_color = pixel_color + 10*torch.rand(1,device=device)*total_alpha #背景噪声
+    # pixel_color = pixel_color + total_alpha #白背景色
     return pixel_color,total_alpha
 
 #渲染得到图片 

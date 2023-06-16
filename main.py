@@ -12,10 +12,10 @@ from util import *
 import pretrained_model
 # torch.autograd.set_detect_anomaly(True)
 torch.manual_seed(1919810)
-caption = "A sculpture of a white cat"
+caption = "a sculpture of a yellow cat"
 intrinsics = (r,r,r)
 resolution = (128,128)
-view_num = 3
+view_num = 2
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
 
@@ -26,7 +26,7 @@ net = SimpleNet(device).to(device)
 clip_model,clip_processor = pretrained_model.get_clip_model_and_processor(device) 
 clean_optimizer = optim.SGD(clip_model.parameters(), lr=5e-6)
 optimizer=torch.optim.Adam(net.parameters(),
-                lr=4e-4,
+                lr=8e-5,
                 betas=(0.9, 0.999),
                 eps=1e-08,
                 weight_decay=0,
@@ -41,8 +41,8 @@ phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) #24
 print(phi_list)
 c2w = get_c2w(theta,phi_list)
 print(c2w.shape)
-
-for epoch in tqdm(range(5000)):
+net.load_state_dict(torch.load("modi_norelu5000_2000" + ".pth"))
+for epoch in tqdm(range(2000)):
     running_loss = 0.0
     optimizer.zero_grad()
     clean_optimizer.zero_grad()
@@ -60,6 +60,12 @@ for epoch in tqdm(range(5000)):
     print(f"[{epoch+1}] \\\
         loss: {running_loss / view_num:3f}")
     epoch_losses.append(running_loss)
-    scheduler.step()
-            
-torch.save(net.state_dict(),"5kiter.pth")
+    scheduler.step()        
+    # if(running_loss/view_num < -50): scheduler.step()
+    if((epoch+1) % 1000 == 0):torch.save(net.state_dict(),"2modi_norelu5000_"+str(epoch+1)+".pth")
+
+plt.switch_backend('Agg') 
+plt.plot(epoch_losses,'b',label = 'loss')        
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.savefig("2modi_norelu5000" + ".jpg") 

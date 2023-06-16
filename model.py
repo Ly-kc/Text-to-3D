@@ -11,21 +11,24 @@ from PIL import Image
 class SimpleNet(nn.Module):
     def __init__(self,device):
         super().__init__()
+        self.residual = nn.Linear(64,256)
         self.x_module = nn.Sequential(
             nn.Linear(64,128),nn.ReLU(),
             nn.Linear(128,256),nn.ReLU(), 
+            nn.Linear(256,256),nn.ReLU(),
+            nn.Linear(256,256),nn.ReLU(),          
             nn.Linear(256,512),nn.ReLU(),
             nn.Linear(512,1024),nn.ReLU(),
-            nn.Linear(1024,256),nn.ReLU()            
+            nn.Linear(1024,256)           
         )
         self.sigma_module = nn.Sequential(
             nn.Linear(256,32),nn.ReLU(),
             nn.Linear(32,1),nn.ReLU() #应当大于零
         )
         self.color_module = nn.Sequential(
-            nn.Linear(256+64,128),nn.ReLU(),
-            nn.Linear(128,64),nn.ReLU(),
-            nn.Linear(64,3),nn.ReLU()
+            nn.Linear(256+64,512),nn.ReLU(),
+            nn.Linear(512,64),nn.ReLU(),
+            nn.Linear(64,3),nn.Sigmoid()
         )
         self.b = torch.tensor(np.load("magic_fourier.npy"),device=device)   
         self.device=device 
@@ -34,7 +37,7 @@ class SimpleNet(nn.Module):
         x = Fourier_embedding(x,self.b,self.device) #batch*64
         dir = Fourier_embedding(dir,self.b,self.device)
         
-        x = self.x_module(x)
+        x = F.relu(self.x_module(x) + self.residual(x))
         sigma = self.sigma_module(x) #batch*1
         
         x = torch.cat((x,dir),dim=1)   #batch*(256+64)
@@ -49,16 +52,15 @@ def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,de
     #preprocess
     color_img = color_img.permute(0,3,1,2)
     color_img = F.interpolate(color_img, size=(224,224))
-    color_img = color_img/255
     color_img = transforms.Normalize(mean=[0.4815,0.4578,0.4082],std=[0.2686,0.2613,0.2758])(color_img)
     # print(color_img.shape)
-    text = clip.tokenize([caption]).to(device)
+    text = clip.tokenize(["Front of "+caption , "Back of "+caption]).to(device)
 
     logits_per_image, logits_per_text = clip_model(color_img.to(torch.float32), text)
-    loss_clip = -logits_per_image.sum(axis=0)[0]
+    loss_clip = -logits_per_image[0][0]-logits_per_image[1][1]
 
     aver_trans = torch.mean(trans_img,dim=(0,1,2))
-    loss_trans = -torch.min(torch.tensor(0.5),aver_trans)[0]
+    loss_trans = -torch.min(torch.tensor(0.6),aver_trans)[0]
 
     print(aver_trans,loss_clip,loss_trans)
     # loss_trans = 0
