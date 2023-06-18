@@ -74,13 +74,13 @@ def visualize_scene():
     intrinsics = (r,r,r)
     resolution = (128,128)
     net = SimpleNet("cuda").to("cuda")
-    net.load_state_dict(torch.load("2modi_norelu5000_2000" + ".pth"))
+    net.load_state_dict(torch.load("2blend_3000" + ".pth"))
     net.eval()
     theta = -np.pi/12  
     phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) 
     c2w = get_c2w(phi=phi_list,theta=theta)
     with torch.no_grad():
-        color_img,trans_img = render_image(net,c2w,intrinsics,resolution,"cuda")
+        color_img,trans_img = render_image(net,c2w,intrinsics,resolution,2,"cuda")
         print(color_img,trans_img)
         # color_img=trans_img.expand(1,128,128,3)
         color_img = color_img.permute(0,3,1,2)
@@ -91,7 +91,7 @@ def visualize_scene():
     for i in range(view_num):
         # print(i,color_img[i])
         img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255))
-        img_pil.save ("./result/" + f"2modi_norelu5000_2000_{i}.jpg")
+        img_pil.save ("./result/" + f"2blend_3000_{i}.jpg")
         # print(np.asarray(image).shape)
         
 def visualize_synthetic():

@@ -46,36 +46,36 @@ def uni_sample(near,far):
 
 #得到光线原点与方向 
 #h，w为像平面上的坐标，原点为左下角   intrinsics：[H,W,focal]   c2w:(n,4,4)
-def get_ray(c2w,h,ws,intrinsics):
+def get_ray(c2w,hs,ws,intrinsics):
     H,W,focal = intrinsics
     #先计算出相机系中的光线
     direction = []
-    for w in ws:
-        direction.append([w-W/2, h-H/2, -focal])
-    direction = np.array(direction)   #(reso[1],3)
-    direction *= (1/np.linalg.norm(direction,axis=1)[:,None]) #(reso[1],3)*(reso[1],1)
+    for h in hs:
+        for w in ws:
+            direction.append([w-W/2, h-H/2, -focal])
+    direction = np.array(direction)   #(reso[0]*len(hs),3)
+    direction *= (1/np.linalg.norm(direction,axis=1)[:,None]) #(reso,3)*(reso,1)
     #再转换到全局坐标系
-    direction = (c2w[:,None,:3,:3]@direction[:,:,None])[...,0] #(n,1,3,3)@(reso[1],3,1) = (n,reso[1],3,1)
-    origin = c2w[:,None,:3,3].repeat(len(ws),axis=1) #(n,reso[1],3)
-    return direction.reshape(-1,3),origin.reshape(-1,3)   #(n*reso[1] , 3)
+    direction = (c2w[:,None,:3,:3]@direction[:,:,None])[...,0] #(n,1,3,3)@(reso,3,1) = (n,reso,3,1)
+    origin = c2w[:,None,:3,3].repeat(len(ws)*len(hs),axis=1) #(n,reso,3)
+    return direction.reshape(-1,3),origin.reshape(-1,3)   #(n*reso, 3)
 
 #得到一条光线的颜色 
 # W:(resolution[1],)
 #返回color:(view_num,resolution[1],sample_num,3)
-def render_one_ray(model,c2w,h,ws,intrinsics,device):
+def render_one_ray(model,c2w,hs,ws,intrinsics,device):
     time0 = time.time()
-    reso = len(ws)
+    reso0,reso1 = len(hs),len(ws)
     view_num = c2w.shape[0]
-    direction,origin = get_ray(c2w,h,ws,intrinsics) #(n*reso[1] , 3)
+    direction,origin = get_ray(c2w,hs,ws,intrinsics) #(n*reso[0]*reso[1] , 3) ,记reso=reso[0]*len(hs)
     time1 = time.time()
     samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n*reso,1,3)  = (n*reso,sample_num,3)
     samples = samples + origin[:,None,:]  #(n*reso,sample_num,3)
     directions = direction[:,None,:].repeat(sample_num, axis=1)  #(n*reso,sample_num,3)
-    # assert(directions[4,6,1] == newdirections[4,6,1])
     time2 = time.time()
     samples,directions = samples.reshape(-1,3),directions.reshape(-1,3) #(n*reso*sample_num,3)
     sigma,color = model(samples,directions)  #返回batch*1, batch*3
-    sigma,color = sigma.view(view_num,reso,sample_num,1),color.view(view_num,reso,sample_num,3) 
+    sigma,color = sigma.view(view_num,reso0,reso1,sample_num,1),color.view(view_num,reso0,reso1,sample_num,3) 
     # print(sigma[0,60],color[0,60])
     time3 = time.time()
     # print(time1-time0,time2-time1,time3-time2)
@@ -92,8 +92,6 @@ def ray_tracing(sigma_samples,color_samples,view_num,resolution,device):
         pixel_color = pixel_color + total_alpha*(1-local_alpha)*color_samples[:,:,:,k,:]  #(n,reso[1],3)
         total_alpha = total_alpha*local_alpha  #(view_num,resolution[0],resolution[1],3)
     
-    # pixel_color = pixel_color + 10*torch.rand(1,device=device)*total_alpha #背景噪声
-    # pixel_color = pixel_color + total_alpha #白背景色
     return pixel_color,total_alpha
 
 #渲染得到图片 
@@ -101,9 +99,10 @@ def ray_tracing(sigma_samples,color_samples,view_num,resolution,device):
 #每次得到n个视角同一个位置像素的颜色 
 # c2w:(n,4,4)
 # color_img:(n,reso[0],reso[1],3) trans_img:(n,reso[0],reso[1],1)
-def render_image(model,c2w,intrinsics,resolution,device):
+def render_image(model,c2w,intrinsics,resolution,background,device):
     H,W,focal = intrinsics
     view_num = c2w.shape[0]
+    row_batch_size = 2
     color_samples = torch.zeros((view_num,resolution[0],resolution[1],sample_num,3),device=device)
     sigma_samples = torch.zeros((view_num,resolution[0],resolution[1],sample_num,1),device=device) 
     color_img = torch.zeros((view_num,resolution[0],resolution[1],3),device=device)
@@ -111,11 +110,17 @@ def render_image(model,c2w,intrinsics,resolution,device):
     #一次处理一行
     ws = [j/(resolution[1]-1)*W for j in range(resolution[1])]
     time1 = time.time()
-    for i in range(resolution[0]):
-        h = i/(resolution[0]-1)*H
-        sigma_samples[:,i],color_samples[:,i] = render_one_ray(model,c2w,h,ws,intrinsics,device)#(n,,reso[1],sample_num,1)  (n,sample_num,3)
+    assert(resolution[0]%row_batch_size == 0)
+    for i in range(0,resolution[0],row_batch_size):
+        hs = [(i+j)/(resolution[0]-1)*H for j in range(row_batch_size)]
+        sigma_samples[:,i:i+row_batch_size],color_samples[:,i:i+row_batch_size] = render_one_ray(model,c2w,hs,ws,intrinsics,device)#(n,,reso[1],sample_num,1)  (n,sample_num,3)
     time2 = time.time()
     color_img,transparence_img = ray_tracing(sigma_samples,color_samples,view_num,resolution,device)
+    # if(background == 0): 
+    #     color_img = color_img + transparence_img #白背景色
+    # elif(background==1):
+    #     color_img = color_img + torch.rand(1,device=device)*transparence_img #背景噪声
+    color_img = color_img + transparence_img #背景色
     time3 = time.time()
     # print(time2-time1,time3-time2)
     

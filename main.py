@@ -4,7 +4,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import time
-
+import math
 # torch.set_default_dtype(torch.float16)
 
 from model import *
@@ -26,12 +26,12 @@ net = SimpleNet(device).to(device)
 clip_model,clip_processor = pretrained_model.get_clip_model_and_processor(device) 
 clean_optimizer = optim.SGD(clip_model.parameters(), lr=5e-6)
 optimizer=torch.optim.Adam(net.parameters(),
-                lr=8e-5,
+                lr=2e-4,
                 betas=(0.9, 0.999),
                 eps=1e-08,
                 weight_decay=0,
                 amsgrad=False)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.97)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.94)
 
 
 epoch_losses = []
@@ -47,7 +47,8 @@ for epoch in tqdm(range(2000)):
     optimizer.zero_grad()
     clean_optimizer.zero_grad()
     time1 = time.time()
-    color_imgs,trans_imgs = render_image(net,c2w,intrinsics,resolution,device)
+    background = math.cos(epoch/500*2*math.pi)/3+2/3
+    color_imgs,trans_imgs = render_image(net,c2w,intrinsics,resolution,background,device)
     time2 = time.time()
     loss = calcu_clip_loss(color_imgs,trans_imgs,caption,clip_model,clip_processor,device)
     time3 = time.time()
@@ -62,10 +63,10 @@ for epoch in tqdm(range(2000)):
     epoch_losses.append(running_loss)
     scheduler.step()        
     # if(running_loss/view_num < -50): scheduler.step()
-    if((epoch+1) % 1000 == 0):torch.save(net.state_dict(),"2modi_norelu5000_"+str(epoch+1)+".pth")
+    if((epoch+1) % 1000 == 0):torch.save(net.state_dict(),"gradual_blend_"+str(epoch+1)+".pth")
 
 plt.switch_backend('Agg') 
 plt.plot(epoch_losses,'b',label = 'loss')        
 plt.ylabel('loss')
 plt.xlabel('epoch')
-plt.savefig("2modi_norelu5000" + ".jpg") 
+plt.savefig("gradual_blend" + ".jpg") 
