@@ -72,9 +72,11 @@ def visualize_ray():
 def visualize_scene():
     view_num = 8
     intrinsics = (r,r,r)
+    print(r)
     resolution = (128,128)
     net = NewNet("cuda").to("cuda")
-    net.load_state_dict(torch.load("gauss_new_net_1000" + ".pth"))
+    # net.load_state_dict(torch.load("gauss_new_net_3000" + ".pth"))
+    net.load_state_dict(torch.load("checkpoints/"+"5yellow_cat_1000" + ".pth"))
     net.eval()
     theta = -np.pi/12  
     phi_list = np.linspace(0,2*np.pi,view_num,endpoint=False) 
@@ -82,8 +84,8 @@ def visualize_scene():
     c2w = get_c2w(phi=phi_list,theta=theta)
     with torch.no_grad():
         net.eval()
-        color_img,trans_img,_ = render_image(net,c2w,intrinsics,resolution,0.2,"cuda")
-        print(color_img,trans_img)
+        color_img,trans_img,_ = render_image(net,c2w,intrinsics,resolution,1,"cuda")
+        # print(color_img,trans_img)
         # color_img=trans_img.expand(1,128,128,3)
         color_img = color_img.permute(0,3,1,2)
         color_img = F.interpolate(color_img, size=(224,224))
@@ -93,7 +95,7 @@ def visualize_scene():
     for i in range(view_num):
         # print(i,color_img[i])
         img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255))
-        img_pil.save ("./result/" + f"gauss_new_net_{i}.jpg")
+        img_pil.save ("./result/" + f"5yellow_cat_{i}.jpg")
         # print(np.asarray(image).shape)
         
 def visualize_synthetic():

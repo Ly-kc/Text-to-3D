@@ -83,14 +83,15 @@ class SimpleNet(nn.Module):
     
     
 
-#image:batch*resolution[0]*resolution[1]    
-def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,view_pos,device):
+#image:batch*resolution[0]*resolution[1]*channel    
+def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,need_view,view_pos,device):
     #preprocess
     color_img = color_img.permute(0,3,1,2)
     color_img = F.interpolate(color_img, size=(224,224))
     color_img = transforms.Normalize(mean=[0.4815,0.4578,0.4082],std=[0.2686,0.2613,0.2758])(color_img)
     # print(color_img.shape)
     view_sentence = ['Front of','Left of','Back of','Right of']
+    if(need_view): caption = view_sentence[view_pos] + caption 
     text = clip.tokenize([view_sentence[view_pos]+caption]).to(device)
 
     logits_per_image, logits_per_text = clip_model(color_img.to(torch.float32), text)

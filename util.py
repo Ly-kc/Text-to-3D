@@ -3,7 +3,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import time
-from main import r,sample_num,fine_sample_num
+import math
+# from main import r,sample_num,fine_sample_num
+
+r = 1. #相机在哪个球面运动
+sample_num = 32 #一次在光线上采样多少点
+fine_sample_num = 8
 #将相机移动旋转到指定地点
 #定义theta为先绕x轴旋转的角度，phi为然后绕y轴旋转的角度
 #phi:(view_num,)
