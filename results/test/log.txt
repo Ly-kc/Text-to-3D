@@ -1,0 +1,21 @@
+caption: a sculpture of a yellow cat
+file_name: test
+model: new
+bg_intensity: 1
+lr: 0.0005
+theta: -0.08333333333333333
+sss: 50
+gamma: 0.95
+radius: 2
+epoch: 10
+save_num: 5
+view_batch: 1
+width: 128
+height: 128
+row_batch: 8
+sample_num: 32
+fine_num: 8
+need_view: False
+bg_gauss: False
+cpu: False
+fix_view: False

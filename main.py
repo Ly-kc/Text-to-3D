@@ -4,7 +4,9 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
 import time
+import os
 import argparse
+from visualize import visualize_scene
 # torch.set_default_dtype(torch.float16)
 
 from model import *
@@ -39,6 +41,7 @@ def get_argparse():
     r = args.radius #相机在哪个球面运动
     sample_num = args.sample_num #一次在光线上采样多少点
     fine_sample_num = args.fine_num
+
     return args
 
 
@@ -71,7 +74,16 @@ def train_scene(args):
     epoch_losses = []
     #选定角度(弧度制)
     theta = -np.pi*args.theta
-    if(args.load_model is not None): net.load_state_dict(torch.load("./checkpoints/" + args.load_model + ".pth"))
+    
+    root = f"./results/{file_name}"
+    if not os.path.isdir(root): 
+        os.mkdir(root)
+    if(args.load_model is not None): net.load_state_dict(torch.load(root+"/"+args.load_model+".pth"))
+    with open(root+'/'+'log.txt','w') as f:
+        for stuff in vars(args): 
+            if(vars(args)[stuff] is None): continue
+            f.write(stuff+': ' + str(vars(args)[stuff]) + '\n')
+    
     for epoch in tqdm(range(args.epoch)):
         running_loss = 0.0
         for i in range(4):
@@ -101,13 +113,15 @@ def train_scene(args):
         epoch_losses.append(running_loss/view_num/4)
         scheduler.step()        
         # if(running_loss/view_num < -50): scheduler.step()
-        if((epoch+1) % args.save_num == 0):torch.save(net.state_dict(),f"./checkpoints/{file_name}_"+str(epoch+1)+".pth")
+        if((epoch+1) % args.save_num == 0):torch.save(net.state_dict(),f"./results/{file_name}/{file_name}_"+str(epoch+1)+".pth")
 
     plt.switch_backend('Agg') 
     plt.plot(epoch_losses,'b',label = 'loss')        
     plt.ylabel('loss')
     plt.xlabel('epoch')
-    plt.savefig(file_name + ".jpg") 
+    plt.savefig(f'./results/{file_name}/' + file_name + ".jpg") 
+    
+    visualize_scene('./results/'+file_name, file_name+'_'+str(args.epoch)+'.pth')
 
 if __name__ ==  "__main__":
     args = get_argparse()
