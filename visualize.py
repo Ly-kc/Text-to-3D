@@ -9,6 +9,7 @@ import json
 
 from model import SimpleNet,NewNet
 
+#相机坐标架可视化
 def visualize_frame():   
     fig = plt.figure()
     ax = fig.add_subplot(projection = '3d') 
@@ -33,6 +34,7 @@ def visualize_frame():
     plt.axis("equal")
     plt.show()
 
+#相机光线与采样点可视化
 def visualize_ray():   
     fig = plt.figure()
     ax = fig.add_subplot(projection = '3d') 
@@ -55,13 +57,13 @@ def visualize_ray():
             ax.plot(ys[:,0,0],ys[:,1,0],ys[:,2,0],color="blue")
             ax.plot(zs[:,0,0],zs[:,1,0],zs[:,2,0],color="green")
             H,W,focal = intrinsics
-            for a in range(resolution[0]):
-                for b in range(resolution[1]):
-                    h,w = a/(resolution[0]-1)*H, b/(resolution[1]-1)*W
-                    direction,origin = get_ray(c2w,h,w,intrinsics) #n*3
-                    samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n,1,3)  = n*sample_num*3
-                    samples = samples + origin[:,None,:]  #n*sample_num*3
-                    ax.scatter(samples[0][::3,0],samples[0][::3,1],samples[0][::3,2],s=5)
+            # for a in range(resolution[0]):
+            #     for b in range(resolution[1]):
+            #         h,w = a/(resolution[0]-1)*H, b/(resolution[1]-1)*W
+            #         direction,origin = get_ray(c2w,h,w,intrinsics) #n*3
+            #         samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n,1,3)  = n*sample_num*3
+            #         samples = samples + origin[:,None,:]  #n*sample_num*3
+            #         ax.scatter(samples[0][::3,0],samples[0][::3,1],samples[0][::3,2],s=5)
                     # dot = (origin + direction*0.5)[0]
                     # origin = origin[0]
                     # ax.plot([origin[0],dot[0]],[origin[1],dot[1]],[origin[2],dot[2]])
@@ -69,6 +71,7 @@ def visualize_ray():
     plt.axis("equal")
     plt.show()    
     
+#场景渲染为图片    
 def visualize_scene(root,ckp):
     view_num = 8
     intrinsics = (r,r,r)
@@ -84,9 +87,8 @@ def visualize_scene(root,ckp):
     c2w = get_c2w(phi=phi_list,theta=theta)
     with torch.no_grad():
         net.eval()
-        color_img,trans_img,_ = render_image(net,c2w,intrinsics,resolution,0.2,"cuda")
+        color_img,trans_img,_ = render_image(net,c2w,intrinsics,resolution,1,"cuda")
         # print(color_img,trans_img)
-        # color_img=trans_img.expand(1,128,128,3)
         color_img = color_img.permute(0,3,1,2)
         color_img = F.interpolate(color_img, size=(224,224))
         color_img = color_img.permute(0,2,3,1)
@@ -97,8 +99,8 @@ def visualize_scene(root,ckp):
         # print(i,color_img[i])
         img_pil = Image.fromarray(np.uint8(color_img[i].cpu().numpy()*255))
         img_pil.save(file_name+'/'+ckp[:-4]+f"_{i}.jpg")
-        # print(np.asarray(image).shape)
-        
+    
+#可视化NeRF数据集的相机位置（在本项目中没有使用）        
 def visualize_synthetic():
     with open('./data/nerf_synthetic/lego/transforms_train.json') as f:
         data = json.load(f)
@@ -129,7 +131,7 @@ def visualize_synthetic():
     plt.show()
     
 if __name__=="__main__":
-    visualize_scene()
+    visualize_scene('results/gauss_4sample_range_test','gauss_4sample_range_test_2000.pth')
     # visualize_frame()
     # visualize_ray()
     # visualize_synthetic()

@@ -8,6 +8,7 @@ from Fourier_Features import Fourier_embedding
 import clip
 from PIL import Image
 
+#依照论文设计的模型
 class NewNet(nn.Module):
     def __init__(self,device):
         super().__init__()
@@ -44,6 +45,7 @@ class NewNet(nn.Module):
         
         return sigma,color
 
+#最初的模型
 class SimpleNet(nn.Module):
     def __init__(self,device):
         super().__init__()
@@ -85,11 +87,11 @@ class SimpleNet(nn.Module):
 
 #image:batch*resolution[0]*resolution[1]*channel    
 def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,need_view,view_pos,device):
-    #preprocess
+    #image preprocess
     color_img = color_img.permute(0,3,1,2)
     color_img = F.interpolate(color_img, size=(224,224))
     color_img = transforms.Normalize(mean=[0.4815,0.4578,0.4082],std=[0.2686,0.2613,0.2758])(color_img)
-    # print(color_img.shape)
+    #text process
     view_sentence = ['Front of','Left of','Back of','Right of']
     if(need_view): caption = view_sentence[view_pos] + caption 
     text = clip.tokenize([view_sentence[view_pos]+caption]).to(device)
@@ -97,9 +99,9 @@ def calcu_clip_loss(color_img,trans_img,caption:str,clip_model,clip_processor,ne
     logits_per_image, logits_per_text = clip_model(color_img.to(torch.float32), text)
     loss_clip = -logits_per_image.sum(axis=0)[0]
 
+    #同原论文的设计
     aver_trans = torch.mean(trans_img,dim=(0,1,2))
     loss_trans = -torch.min(torch.tensor(0.6),aver_trans)[0]
 
     print(aver_trans,loss_clip)
-    # loss_trans = 0
     return loss_clip + loss_trans*2

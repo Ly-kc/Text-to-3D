@@ -37,6 +37,7 @@ def get_c2w(theta,phi):
     
 #pdf:(view_num,row_batch,col,sample_num)
 #return: (view_num,row_batch,col,sample_num,1) 每个小区间中采样点到原点的距离
+# remain to fix
 def pdf_sample(pdf,near,far):
     pdf = pdf*(1/(pdf.sum(axis=-1)[...,None]))
     ends = np.linspace(near,far,sample_num+1) #所有的端点
@@ -45,7 +46,7 @@ def pdf_sample(pdf,near,far):
     random_num = torch.rand(list(cdf.shape[:-1])+[fine_sample_num])  #(view_num,row_batch,col,fine_sample_num)
     index = torch.searchsorted(cdf,random_num)-1 #采样第几个区间 (view_num,row_batch,col,fine_sample_num)
     samples = torch.zeros_like(index)
-    #有待在选中的区间中平均采样
+    #有待在选中的区间中平均采样(尚未完成)
     return samples[...,None]
         
     
@@ -80,13 +81,13 @@ def get_ray(c2w,hs,ws,intrinsics):
 #得到一条光线的颜色 
 # W:(resolution[1],)
 #返回color:(view_num,resolution[1],sample_num,3)
-def render_one_ray(model,c2w,hs,ws,intrinsics,device):
+def get_density_and_color(model,c2w,hs,ws,intrinsics,device):
     time0 = time.time()
     reso0,reso1 = len(hs),len(ws)
     view_num = c2w.shape[0]
     direction,origin = get_ray(c2w,hs,ws,intrinsics) #(n*reso[0]*reso[1] , 3) ,记reso=reso[0]*len(hs)
     time1 = time.time()
-    samples = uni_sample(0.5*r, 1.5*r)*direction[:,None,:]  #(sample_num,1) * (n*reso,1,3)  = (n*reso,sample_num,3)
+    samples = uni_sample(0.6*r, 1.4*r)*direction[:,None,:]  #(sample_num,1) * (n*reso,1,3)  = (n*reso,sample_num,3)
     samples = samples + origin[:,None,:]  #(n*reso,sample_num,3)
     directions = direction[:,None,:].repeat(sample_num, axis=1)  #(n*reso,sample_num,3)
     time2 = time.time()
@@ -118,7 +119,13 @@ def ray_tracing(sigma_samples,color_samples,view_num,resolution,device):
 #每次得到n个视角同一个位置像素的颜色 
 # c2w:(n,4,4)
 # color_img:(n,reso[0],reso[1],3) trans_img:(n,reso[0],reso[1],1)
-def render_image(model,c2w,intrinsics,resolution,background,device):
+def render_image(model,c2w,intrinsics,resolution,background,device,args=None):
+    if(args is not None):
+        global r,sample_num,fine_sample_num
+        r = args['radius'] #相机在哪个球面运动
+        sample_num = args['sample_num'] #一次在光线上采样多少点
+        fine_sample_num = args['fine_num']
+        
     H,W,focal = intrinsics
     view_num = c2w.shape[0]
     row_batch_size = 8
@@ -132,7 +139,7 @@ def render_image(model,c2w,intrinsics,resolution,background,device):
     assert(resolution[0]%row_batch_size == 0)
     for i in range(0,resolution[0],row_batch_size):
         hs = [(i+j)/(resolution[0]-1)*H for j in range(row_batch_size)]
-        sigma_samples[:,i:i+row_batch_size],color_samples[:,i:i+row_batch_size] = render_one_ray(model,c2w,hs,ws,intrinsics,device)#(n,,reso[1],sample_num,1)  (n,sample_num,3)
+        sigma_samples[:,i:i+row_batch_size],color_samples[:,i:i+row_batch_size] = get_density_and_color(model,c2w,hs,ws,intrinsics,device)#(n,,reso[1],sample_num,1)  (n,sample_num,3)
     time2 = time.time()
     color_img,transparence_img,weights = ray_tracing(sigma_samples,color_samples,view_num,resolution,device)
     # color_img = color_img + torch.rand(1,device=device)*transparence_img #背景噪声
